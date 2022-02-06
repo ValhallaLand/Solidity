@@ -304,7 +304,7 @@ contract ERC20 is Context, IERC20, Ownable {
         require(_balances[_msgSender()] >= _amount, "Insufficient token balance to buy item");
 
         require(!usedNonces[nonce]);
-        bytes32 message = prefixed(keccak256(abi.encodePacked(_category, _amount, nonce, address(this), args)));
+        bytes32 message = prefixed(keccak256(abi.encodePacked(_category, _mode, _amount, nonce, address(this), args)));
         address signer = recoverSigner(message, sig);
         require(signer ==_verifier, "Unauthorized transaction");
         usedNonces[nonce] = true;
