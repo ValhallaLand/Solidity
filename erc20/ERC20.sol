@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity ^0.8.0;
+pragma solidity 0.8.7;
 
 import "./IERC20.sol";
 import "./Context.sol";
@@ -20,53 +20,56 @@ contract ERC20 is Context, IERC20, Ownable {
     mapping (address => Vesting) public vestings;
     mapping (address => Vesting[]) public vestingsLock;
 
+    mapping (address => Vesting) public IDOvestings;
+    mapping (address => Vesting[]) public IDOLock;
+
     mapping(address => uint256) private _balances;
 
     mapping(address => mapping(address => uint256)) private _allowances;
 
     mapping(uint256 => bool) private usedNonces;
 
-    uint256 private _totalSupply;
+    uint256 private _totalSupply = 100000000e18;
     uint8 private _decimals = 18;
-    string private _name;
-    string private _symbol;
+    string private _name = "Valhalla Land Testnet Token";
+    string private _symbol = "tVALH";
 
     MyNFT private _mainContract;
 
     address private _verifier;
 
-    uint256 public _totalTreasuryBalance;
+    uint256 public _totalTreasuryBalance = 36000000e18;
     Vesting[] public treasuryBalanceLock;
     uint8 public indexTreasuryLock;
     bool private _isInitTreasure = false;
 
-    uint256 public _totalLiquidityBalance;
+    uint256 public _totalLiquidityBalance = 9000000e18;
     Vesting[] public liquidityBalanceLock;
     uint8 public indexLiquidityLock;
 
-    address public _marketingWallet = 0xE72E3D8017064934F054290E8eDb2E321cE62Da5;
-    address public _teamWallet = 0x3fD8B95f2dB23B17C4c2275E04A73803390f1482;
-    address public _seedWallet = 0x2991CD5c95B089dFb09B44D2f8687C9dEA2C4aDd;
-    address public _privateWallet = 0xAA58939a62ACb293e152E59F21Ce3b7aAADa9707;
-    uint256 private _IDOAmount;
-    uint256 public _treasuryBalance;
-    uint256 public _liquidityBalance;
+    address public constant _marketingWallet = 0xE72E3D8017064934F054290E8eDb2E321cE62Da5;
+    address public constant _teamWallet = 0x3fD8B95f2dB23B17C4c2275E04A73803390f1482;
+    address public constant _seedWallet = 0x2991CD5c95B089dFb09B44D2f8687C9dEA2C4aDd;
+    address public constant _privateWallet = 0xAA58939a62ACb293e152E59F21Ce3b7aAADa9707;
+    uint256 private _IDOAmount = 500000e18;
+    uint256 public _treasuryBalance = 0;
+    uint256 public _liquidityBalance = 3000000e18;
     uint256 public _vestingBalance;
+    uint256 public _IDOBalance;
 
     bool private _enableTransfer = false;
+    uint256 private constant partAmmount = 1000000e18;
+    uint256 private constant countMounth = 36;
+
 
     event ItemBought(address indexed buyer, uint256 _nftID, uint256 _amount, string args);
     event ClaimTokens(address indexed to, uint256 _amount, uint256 _mode, uint256 _nonce);
 
     constructor(address cOwner, address verifier) Ownable (cOwner) {
-        _name = "Valhalla Land Testnet Token";
-        _symbol = "tVALH";
+
+        require(verifier != address(0), "Zero address for verifier");
+
         _verifier = verifier;
-        _totalSupply = 100000000 * 10 ** _decimals;
-        _totalLiquidityBalance = 9000000 * 10 ** _decimals;
-        _liquidityBalance = 3000000 * 10 ** _decimals;
-        _totalTreasuryBalance = 36000000 * 10 ** _decimals;
-        _treasuryBalance = 0;
 
         _balances[_marketingWallet] = 0;
         _balances[_teamWallet] = 0;
@@ -75,47 +78,42 @@ contract ERC20 is Context, IERC20, Ownable {
         emit Transfer(address(0), _privateWallet, _balances[_privateWallet]);
         _balances[address(this)] = _totalSupply - _balances[_privateWallet];
 
-        _IDOAmount = 500000 * 10 ** _decimals;        
+        _balances[address(this)] = _balances[address(this)] - _liquidityBalance;
 
         emit Transfer(address(0), address(this), _totalSupply - _balances[_privateWallet]);        
-        _vestingBalance = _balances[_privateWallet];
 
         //IDO
         _balances[0xCCc1921491c55B7321d384b0CF2F504F94b81EF9] = _IDOAmount;
         emit Transfer(address(0), 0xCCc1921491c55B7321d384b0CF2F504F94b81EF9, _IDOAmount);
         _balances[address(this)] = _balances[address(this)] -_IDOAmount;
         emit Transfer(address(0), address(this), _balances[address(this)]);        
-        _vestingBalance = _vestingBalance + _IDOAmount;
-        addVestingLock(0xCCc1921491c55B7321d384b0CF2F504F94b81EF9, _IDOAmount, block.timestamp + 3 * 30 days);
-        addVestingLock(0xCCc1921491c55B7321d384b0CF2F504F94b81EF9, _IDOAmount, block.timestamp + 6 * 30 days);
-        addVestingLock(0xCCc1921491c55B7321d384b0CF2F504F94b81EF9, _IDOAmount, block.timestamp + 9 * 30 days);
+        addIDOLock(0xCCc1921491c55B7321d384b0CF2F504F94b81EF9, _IDOAmount, block.timestamp + 3 * 30 days);
+        addIDOLock(0xCCc1921491c55B7321d384b0CF2F504F94b81EF9, _IDOAmount, block.timestamp + 6 * 30 days);
+        addIDOLock(0xCCc1921491c55B7321d384b0CF2F504F94b81EF9, _IDOAmount, block.timestamp + 9 * 30 days);
 
         _balances[0xf86A54fEe000f8A2F521F83202e1056A0486DE09] = _IDOAmount;
         emit Transfer(address(0), 0xf86A54fEe000f8A2F521F83202e1056A0486DE09, _IDOAmount);
         _balances[address(this)] = _balances[address(this)] -_IDOAmount;
         emit Transfer(address(0), address(this), _balances[address(this)]);        
-        _vestingBalance = _vestingBalance + _IDOAmount;
-        addVestingLock(0xf86A54fEe000f8A2F521F83202e1056A0486DE09, _IDOAmount, block.timestamp + 3 * 30 days);
-        addVestingLock(0xf86A54fEe000f8A2F521F83202e1056A0486DE09, _IDOAmount, block.timestamp + 6 * 30 days);
-        addVestingLock(0xf86A54fEe000f8A2F521F83202e1056A0486DE09, _IDOAmount, block.timestamp + 9 * 30 days);
+        addIDOLock(0xf86A54fEe000f8A2F521F83202e1056A0486DE09, _IDOAmount, block.timestamp + 3 * 30 days);
+        addIDOLock(0xf86A54fEe000f8A2F521F83202e1056A0486DE09, _IDOAmount, block.timestamp + 6 * 30 days);
+        addIDOLock(0xf86A54fEe000f8A2F521F83202e1056A0486DE09, _IDOAmount, block.timestamp + 9 * 30 days);
 
         _balances[0x1644A35e915F4dDbfE088E7A7C1c77595CF77067] = _IDOAmount;
         emit Transfer(address(0), 0x1644A35e915F4dDbfE088E7A7C1c77595CF77067, _IDOAmount);
         _balances[address(this)] = _balances[address(this)] -_IDOAmount;
         emit Transfer(address(0), address(this), _balances[address(this)]);        
-        _vestingBalance = _vestingBalance + _IDOAmount;
-        addVestingLock(0x1644A35e915F4dDbfE088E7A7C1c77595CF77067, _IDOAmount, block.timestamp + 3 * 30 days);
-        addVestingLock(0x1644A35e915F4dDbfE088E7A7C1c77595CF77067, _IDOAmount, block.timestamp + 6 * 30 days);
-        addVestingLock(0x1644A35e915F4dDbfE088E7A7C1c77595CF77067, _IDOAmount, block.timestamp + 9 * 30 days);
+        addIDOLock(0x1644A35e915F4dDbfE088E7A7C1c77595CF77067, _IDOAmount, block.timestamp + 3 * 30 days);
+        addIDOLock(0x1644A35e915F4dDbfE088E7A7C1c77595CF77067, _IDOAmount, block.timestamp + 6 * 30 days);
+        addIDOLock(0x1644A35e915F4dDbfE088E7A7C1c77595CF77067, _IDOAmount, block.timestamp + 9 * 30 days);
 
         _balances[0xf8056e8286D78b286e85Ff73532F7c0C590D7913] = _IDOAmount;
         emit Transfer(address(0), 0xf8056e8286D78b286e85Ff73532F7c0C590D7913, _IDOAmount);
         _balances[address(this)] = _balances[address(this)] -_IDOAmount;
         emit Transfer(address(0), address(this), _balances[address(this)]);        
-        _vestingBalance = _vestingBalance + _IDOAmount;
-        addVestingLock(0xf8056e8286D78b286e85Ff73532F7c0C590D7913, _IDOAmount, block.timestamp + 3 * 30 days);
-        addVestingLock(0xf8056e8286D78b286e85Ff73532F7c0C590D7913, _IDOAmount, block.timestamp + 6 * 30 days);
-        addVestingLock(0xf8056e8286D78b286e85Ff73532F7c0C590D7913, _IDOAmount, block.timestamp + 9 * 30 days);        
+        addIDOLock(0xf8056e8286D78b286e85Ff73532F7c0C590D7913, _IDOAmount, block.timestamp + 3 * 30 days);
+        addIDOLock(0xf8056e8286D78b286e85Ff73532F7c0C590D7913, _IDOAmount, block.timestamp + 6 * 30 days);
+        addIDOLock(0xf8056e8286D78b286e85Ff73532F7c0C590D7913, _IDOAmount, block.timestamp + 9 * 30 days);        
         //
 
         addVestingLock(_marketingWallet, 1000000 * 10 ** _decimals, block.timestamp + 4 * 30 days);
@@ -203,16 +201,33 @@ contract ERC20 is Context, IERC20, Ownable {
                                     deadline: deadline
                                 });
         liquidityBalanceLock.push(vst);
+        _balances[address(this)] = _balances[address(this)] - _amount;
     }
 
     function addVestingLock(address _wallet, uint256 _ammount, uint256 _deadline) internal {
+        require(_wallet != address(0), "Zero address");
+
         Vesting memory vst = Vesting({
                                     amount: _ammount,
                                     deadline: _deadline
                                 });
                                 
         vestingsLock[_wallet].push(vst);
+        _balances[address(this)] = _balances[address(this)] - _ammount;
     }
+
+    function addIDOLock(address _wallet, uint256 _ammount, uint256 _deadline) internal {
+        require(_wallet != address(0), "Zero address");
+
+        Vesting memory vst = Vesting({
+                                    amount: _ammount,
+                                    deadline: _deadline
+                                });
+                                
+        IDOLock[_wallet].push(vst);
+        _balances[address(this)] = _balances[address(this)] - _ammount;
+    }
+
 
     function releaseVesting(address _wallet) private {
         if (vestingsLock[_wallet][0].deadline <= block.timestamp && vestingsLock[_wallet][0].amount > 0) {            
@@ -226,13 +241,23 @@ contract ERC20 is Context, IERC20, Ownable {
         }
     }
 
+    function releaseIDO(address _wallet) private {
+        if (IDOLock[_wallet][0].deadline <= block.timestamp && IDOLock[_wallet][0].amount > 0) {            
+            IDOvestings[_wallet].amount += IDOLock[_wallet][0].amount;
+            _IDOBalance += IDOLock[_wallet][0].amount;
+            emit Transfer(address(0), _wallet, IDOLock[_wallet][0].amount);
+            for (uint i = 0; i < IDOLock[_wallet].length - 1; i++) {
+                IDOLock[_wallet][i] = IDOLock[_wallet][i+1];
+            }
+            delete IDOLock[_wallet][IDOLock[_wallet].length - 1];
+        }
+    }
+
     function initTreasure() external onlyOwner {
-        require(!_isInitTreasure, "Treasury initialized");     
+        require(!_isInitTreasure, "Treasury initialized");
 
-        
-        uint256 partAmmount = 1000000 * 10 ** _decimals;
-
-        for (uint256 i = 1; i <= 36; i++) {
+    
+        for (uint256 i = 1; i <= countMounth; i++) {
             Vesting memory vst = Vesting({
                                     amount: partAmmount,
                                     deadline: block.timestamp + i * 30 days
@@ -262,21 +287,30 @@ contract ERC20 is Context, IERC20, Ownable {
         }
     }
 
+    function claimIDO() external {
+        releaseIDO(_msgSender());
+        require(IDOvestings[_msgSender()].amount > 0, "Insufficient token amount to claim");
+                
+        _balances[_msgSender()] = _balances[_msgSender()] + IDOvestings[_msgSender()].amount;
+        _IDOBalance -= IDOvestings[_msgSender()].amount;
+        emit Transfer(address(this), _msgSender(), IDOvestings[_msgSender()].amount);
+        IDOvestings[_msgSender()].amount = 0;
+    }
+
     function claimVesting() external {
         releaseVesting(_msgSender());
         require(vestings[_msgSender()].amount > 0, "Insufficient token amount to claim");
                 
-        _balances[address(this)] = _balances[address(this)] - vestings[_msgSender()].amount;
         _balances[_msgSender()] = _balances[_msgSender()] + vestings[_msgSender()].amount;
         _vestingBalance -= vestings[_msgSender()].amount;
         emit Transfer(address(this), _msgSender(), vestings[_msgSender()].amount);
         vestings[_msgSender()].amount = 0;
     }
-
+    
     function claim(uint256 _amount, uint8 _mode, uint256 nonce, bytes memory sig) external {
         require((_mode == 1 || _mode == 2), "Invalid mode. Use '1' for treasury claim and '2' for liquidity claim");
         require(!usedNonces[nonce]);
-        bytes32 message = prefixed(keccak256(abi.encodePacked(nonce, address(this))));
+        bytes32 message = prefixed(keccak256(abi.encodePacked(_amount, _mode, nonce, address(this))));
         address signer = recoverSigner(message, sig);
         require(signer ==_verifier, "Unauthorized transaction");
         usedNonces[nonce] = true;
@@ -291,7 +325,6 @@ contract ERC20 is Context, IERC20, Ownable {
         } else {
             releaseLiquidity();
             require(_liquidityBalance >= _amount, "Insufficient amount to claim");
-            _balances[address(this)] = _balances[address(this)] - _amount;
             _balances[_msgSender()] = _balances[_msgSender()] + _amount;
             _liquidityBalance -= _amount;
             emit Transfer(address(this), _msgSender(), _amount);
@@ -367,33 +400,33 @@ contract ERC20 is Context, IERC20, Ownable {
 
 
 
-    function name() public view virtual override returns (string memory) {
+    function name() external view virtual override returns (string memory) {
         return _name;
     }
 
 
-    function symbol() public view virtual override returns (string memory) {
+    function symbol() external view virtual override returns (string memory) {
         return _symbol;
     }
 
 
-    function decimals() public view virtual override returns (uint8) {
+    function decimals() external view virtual override returns (uint8) {
         return _decimals;
     }
 
 
-    function totalSupply() public view virtual override returns (uint256) {
+    function totalSupply() external view virtual override returns (uint256) {
         return _totalSupply;
     }
 
 
 
-    function balanceOf(address account) public view virtual override returns (uint256) {
+    function balanceOf(address account) external view virtual override returns (uint256) {
         return _balances[account];
     }
 
 
-    function transfer(address recipient, uint256 amount) public virtual override isTransfer returns (bool) {
+    function transfer(address recipient, uint256 amount) external virtual override isTransfer returns (bool) {
         _transfer(_msgSender(), recipient, amount);
         return true;
     }
